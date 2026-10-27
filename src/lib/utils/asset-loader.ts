@@ -197,11 +197,21 @@ export async function fetchAssembledBlob(
 
         const contentLength = res.headers.get('content-length');
         const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-        
+
+        let mimeType = 'application/octet-stream';
+        const lowerUrl = url.toLowerCase();
+        if (lowerUrl.includes('.wasm')) mimeType = 'application/wasm';
+        else if (lowerUrl.includes('.js')) mimeType = 'application/javascript';
+        else if (lowerUrl.includes('.ttf')) mimeType = 'font/ttf';
+        else if (lowerUrl.includes('.otf')) mimeType = 'font/otf';
+        else if (lowerUrl.includes('.woff2')) mimeType = 'font/woff2';
+
         if (!res.body || totalBytes === 0 || !onProgress) {
-            const blob = await res.blob();
-            onProgress?.({ loadedBytes: blob.size, totalBytes: blob.size });
-            resultBlob = blob;
+            const buf = await (typeof res.arrayBuffer === 'function'
+                ? res.arrayBuffer()
+                : res.blob().then((b: any) => b.arrayBuffer()));
+            onProgress?.({ loadedBytes: buf.byteLength, totalBytes: buf.byteLength });
+            resultBlob = new Blob([buf], { type: mimeType });
         } else {
             const reader = res.body.getReader();
             let loadedBytes = 0;
@@ -216,14 +226,6 @@ export async function fetchAssembledBlob(
                     onProgress({ loadedBytes, totalBytes });
                 }
             }
-
-            let mimeType = 'application/octet-stream';
-            const lowerUrl = url.toLowerCase();
-            if (lowerUrl.includes('.wasm')) mimeType = 'application/wasm';
-            else if (lowerUrl.includes('.js')) mimeType = 'application/javascript';
-            else if (lowerUrl.includes('.ttf')) mimeType = 'font/ttf';
-            else if (lowerUrl.includes('.otf')) mimeType = 'font/otf';
-            else if (lowerUrl.includes('.woff2')) mimeType = 'font/woff2';
 
             resultBlob = new Blob(chunks as unknown as BlobPart[], { type: mimeType });
         }
